@@ -4,9 +4,14 @@
   "description": "CLI tool for reading and editing Notion entries through Markdown and CSV. AI agent friendly.",
   "type": "module",
   "bin": {
+    "notion-md-csv-cli": "./dist/index.js",
     "notion-cli": "./dist/index.js"
   },
   "main": "./dist/index.js",
+  "files": [
+    "dist/**/*",
+    "README.md"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/index.ts",

@@ -16,6 +16,7 @@ import { printSuccess, printError } from '../../lib/output.js';
 import { confirmAction, isDryRun } from '../../lib/safety.js';
 import { withRetry } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
+import { unescapeString } from '../../utils/string.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError, ValidationError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
@@ -39,7 +40,7 @@ export function registerBlockAppendCommand(block: Command): void {
           if (cmdOpts.file !== undefined) {
             markdown = readFileSync(cmdOpts.file, 'utf-8');
           } else if (cmdOpts.content !== undefined) {
-            markdown = cmdOpts.content;
+            markdown = unescapeString(cmdOpts.content);
           } else {
             throw new ValidationError(
               'No content provided. Use --file or --content.',

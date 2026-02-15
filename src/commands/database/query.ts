@@ -37,7 +37,10 @@ export function registerDbQueryCommand(db: Command): void {
 
           // Parse filter and sort
           const filter = cmdOpts.filter !== undefined ? JSON.parse(cmdOpts.filter) as Record<string, unknown> : undefined;
-          const sorts = cmdOpts.sort !== undefined ? JSON.parse(cmdOpts.sort) as Array<Record<string, unknown>> : undefined;
+          const parsedSort = cmdOpts.sort !== undefined ? JSON.parse(cmdOpts.sort) as Record<string, unknown> | Array<Record<string, unknown>> : undefined;
+          const sorts = parsedSort !== undefined
+            ? (Array.isArray(parsedSort) ? parsedSort : [parsedSort])
+            : undefined;
 
           // Query the database
           const response = await withRetry(

@@ -9,9 +9,16 @@
 
 import { markdownToBlocks } from '@tryfabric/martian';
 import { NotionToMarkdown } from 'notion-to-md';
+import { type MdBlock } from 'notion-to-md/build/types/index.js';
 import { type Client } from '@notionhq/client';
 import { type BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints.js';
 import * as logger from '../utils/logger.js';
+
+/** Shape of a child_page block from the Notion API. */
+interface ChildPageNotionBlock {
+  id: string;
+  child_page?: { title?: string };
+}
 
 /**
  * Convert a Markdown string to an array of Notion block objects.
@@ -37,15 +44,60 @@ export async function notionPageToMarkdown(
   logger.debug(`Fetching page ${pageId} and converting to Markdown.`);
 
   const n2m = new NotionToMarkdown({ notionClient: client });
-  const blocks = await n2m.pageToMarkdown(pageId);
-  const markdown = n2m.toMarkdownString(blocks);
+  
+  // Custom transformer to prevent embedding child pages (only show a link/title)
+  n2m.setCustomTransformer('child_page', (block) => {
+    const cpBlock = block as unknown as ChildPageNotionBlock;
+    const title = cpBlock.child_page?.title ?? 'Untitled Page';
+    const id = block.id.replace(/-/g, '');
+    return `[[${title}]](https://www.notion.so/${id})`;
+  });
 
-  // notion-to-md v3 returns { parent: string } object
-  const result = typeof markdown === 'string' ? markdown : markdown.parent;
-  const output = result ?? '';
+  const blocks = await n2m.pageToMarkdown(pageId);
+  
+  // Custom blocks like child_page might be ignored by toMarkdownString
+  // if not handled specifically. We force them to be treated as paragraphs.
+  fixChildPageBlocks(blocks);
+
+  // notion-to-md v3 returns MdStringObject (Record<string, string>)
+  const markdownResult = n2m.toMarkdownString(blocks);
+  const result = markdownResult['parent'];
+
+  logger.debug(`toMarkdownString produced ${String(result?.length)} chars.`);
+  if (result !== undefined && result !== '') {
+    logger.debug(`Final 100 chars: ${result.slice(-100)}`);
+  }
+
+  const output = cleanMarkdownOutput(result ?? '');
 
   logger.debug(`Converted page to ${String(output.length)} chars of Markdown.`);
   return output;
+}
+
+/**
+ * Clean raw Markdown output:
+ * - Trim leading/trailing whitespace
+ * - Collapse 3+ consecutive newlines into exactly 2
+ */
+export function cleanMarkdownOutput(raw: string): string {
+  return raw
+    .trim()
+    .replace(/\n{3,}/g, '\n\n');
+}
+
+/**
+ * Recursively rewrite child_page blocks to paragraph so that
+ * toMarkdownString includes them in the output.
+ */
+export function fixChildPageBlocks(mdBlocks: MdBlock[]): void {
+  for (const b of mdBlocks) {
+    if (b.type === 'child_page') {
+      b.type = 'paragraph';
+    }
+    if (b.children.length > 0) {
+      fixChildPageBlocks(b.children);
+    }
+  }
 }
 
 /**

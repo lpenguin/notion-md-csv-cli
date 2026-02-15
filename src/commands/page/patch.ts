@@ -42,6 +42,7 @@ import { confirmAction, isDryRun, showDiffPreview } from '../../lib/safety.js';
 import { withRetry } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { lineRangeSchema } from '../../lib/validator.js';
+import { unescapeString } from '../../utils/string.js';
 import { type GlobalOptions, type PatchOperation, type PagePatchResult } from '../../lib/types.js';
 import { toCliError, ValidationError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
@@ -266,7 +267,7 @@ function resolveContentSync(filePath?: string, inlineContent?: string): string {
     return readFileSync(filePath, 'utf-8');
   }
   if (inlineContent !== undefined) {
-    return inlineContent;
+    return unescapeString(inlineContent);
   }
   throw new ValidationError(
     'No content provided for patch. Use --file or --content.',

@@ -12,11 +12,11 @@
 import { type Command } from 'commander';
 import { getClient } from '../../lib/client.js';
 import { notionPageToMarkdown, addLineNumbers } from '../../lib/markdown.js';
-import { printSuccess } from '../../lib/output.js';
 import { withRetry } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
-import { type GlobalOptions, type PageReadResult } from '../../lib/types.js';
+import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
+import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
 import * as logger from '../../utils/logger.js';
 
 export function registerPageReadCommand(page: Command): void {
@@ -58,24 +58,24 @@ export function registerPageReadCommand(page: Command): void {
           'pageToMarkdown',
         );
 
-        const lastEdited = (pageObj as Record<string, unknown>)['last_edited_time'] as string | undefined;
-
         if (cmdOpts.numberedLines === true) {
           markdown = addLineNumbers(markdown);
         }
 
-        const result: PageReadResult = {
-          pageId,
-          title,
-          markdown,
-          lastEditedTime: lastEdited ?? '',
-        };
-
-        printSuccess(result);
-        logger.success(`Read page: ${title}`);
+        // Output
+        if (isJsonMode()) {
+          printSuccess({ pageId, title, markdown });
+        } else {
+          process.stdout.write(`${markdown}\n`);
+          logger.success(`Read page: ${title}`);
+        }
       } catch (err) {
         const cliErr = toCliError(err);
-        logger.error(cliErr.message);
+        if (isJsonMode()) {
+          printError(cliErr.code, cliErr.message);
+        } else {
+          logger.error(cliErr.message);
+        }
         process.exitCode = cliErr.exitCode;
       }
     });

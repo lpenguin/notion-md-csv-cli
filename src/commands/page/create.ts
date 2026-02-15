@@ -17,6 +17,7 @@ import { printSuccess, printError } from '../../lib/output.js';
 import { confirmAction, isDryRun } from '../../lib/safety.js';
 import { withRetry } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
+import { unescapeString } from '../../utils/string.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError, ValidationError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
@@ -121,7 +122,7 @@ function resolveCreateContent(filePath?: string, inlineContent?: string): string
     return readFileSync(filePath, 'utf-8');
   }
   if (inlineContent !== undefined) {
-    return inlineContent;
+    return unescapeString(inlineContent);
   }
   throw new ValidationError('No content provided. Use --file or --content.');
 }

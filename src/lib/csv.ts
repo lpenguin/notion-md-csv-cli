@@ -73,7 +73,7 @@ export function csvToRows(
     const properties: Record<string, string> = {};
 
     for (const [key, value] of Object.entries(record)) {
-      if (key !== '_notion_id' && value !== undefined) {
+      if (key !== '_notion_id') {
         properties[key] = value;
       }
     }
@@ -153,6 +153,7 @@ export function buildPropertyValue(
  */
 function extractPropertyValue(prop: NotionPropertyValue): string {
   const type = prop['type'] as string | undefined;
+  if (type === undefined) return JSON.stringify(prop);
 
   switch (type) {
     case 'title':
@@ -226,7 +227,7 @@ function extractDate(val: unknown): string {
   const d = val as Record<string, unknown>;
   const start = (d['start'] as string | undefined) ?? '';
   const end = d['end'] as string | undefined;
-  return end !== undefined && end !== null ? `${start}|${end}` : start;
+  return end !== undefined ? `${start}|${end}` : start;
 }
 
 function extractFormula(val: unknown): string {
@@ -272,10 +273,12 @@ function extractFiles(val: unknown): string {
     .map((f) => {
       const fType = f['type'] as string | undefined;
       if (fType === 'external') {
-        return ((f['external'] as Record<string, unknown>)?.['url'] as string | undefined) ?? '';
+        const external = f['external'] as Record<string, unknown> | undefined;
+        return (external?.['url'] as string | undefined) ?? '';
       }
       if (fType === 'file') {
-        return ((f['file'] as Record<string, unknown>)?.['url'] as string | undefined) ?? '';
+        const file = f['file'] as Record<string, unknown> | undefined;
+        return (file?.['url'] as string | undefined) ?? '';
       }
       return '';
     })

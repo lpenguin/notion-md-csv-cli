@@ -45,7 +45,8 @@ export function registerDbSchemaCommand(db: Command): void {
 
             // Extract select/multi_select/status options
             if (type === 'select' || type === 'multi_select' || type === 'status') {
-              const optionsArr = (prop[type] as Record<string, unknown>)?.['options'] as
+              const typeProp = prop[type] as Record<string, unknown> | undefined;
+              const optionsArr = typeProp?.['options'] as
                 | Array<Record<string, unknown>>
                 | undefined;
               if (optionsArr !== undefined) {

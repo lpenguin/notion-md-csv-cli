@@ -113,15 +113,37 @@ notion-cli page list --cursor <cursor>
 
 ### Databases
 
+Query, export, import, and inspect Notion databases.
+
+#### `db list` — List databases
+
+List accessible Notion databases.
+
 ```bash
-# Query database entries
+notion-cli db list
+notion-cli db list --query "Projects" --limit 10
+```
+
+#### `db query` — Query Database
+
+Query a Notion database. Outputs CSV by default, JSON with `--json`.
+
+```bash
 notion-cli db query <database-id>
 notion-cli db query <database-id> --filter '{"property":"Status","select":{"equals":"Done"}}'
+```
 
-# Export to CSV
+#### `db export` — Export to CSV
+
+Export full Notion database to CSV.
+
+```bash
 notion-cli db export <database-id> --out data.csv
+```
 
-# Imports from CSV
+#### `db import` — Import from CSV
+
+Import CSV rows into a Notion database.
 
 ```bash
 notion-cli db import <database-id> --file data.csv
@@ -135,11 +157,30 @@ notion-cli db import <database-id> --file data.csv --sync
 
 > ⚠️ **Warning on --sync:** This mode is destructive. It ensures the database in Notion exactly matches your CSV. If a row exists in Notion but its `_notion_id` is missing from your CSV, it will be deleted from the database.
 
-### `db list` — List databases
+#### `db create` — Create Database
 
-# Get database schema
+Create a new Notion database in a parent page.
+
+```bash
+notion-cli db create --parent <page-id> --title "My Database"
+notion-cli db create --parent <page-id> --title "Tasks" --schema '{"Status": {"select": {}}}'
+```
+
+| Option | Description |
+|--------|-------------|
+| `-p, --parent <id>` | **Required.** Parent page ID |
+| `-t, --title <text>`| **Required.** Database title |
+| `-s, --schema <json>`| Database schema (Notion properties JSON) |
+
+#### `db schema` — Show Schema
+
+Show database property schema.
+
+```bash
 notion-cli db schema <database-id>
 ```
+
+---
 
 ### Search
 

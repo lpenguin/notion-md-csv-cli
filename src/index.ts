@@ -50,6 +50,7 @@ import { registerDbQueryCommand } from './commands/database/query.js';
 import { registerDbExportCommand } from './commands/database/export.js';
 import { registerDbImportCommand } from './commands/database/import.js';
 import { registerDbListCommand } from './commands/database/list.js';
+import { registerDbCreateCommand } from './commands/database/create.js';
 import { registerDbSchemaCommand } from './commands/database/schema.js';
 
 // Search command
@@ -102,6 +103,7 @@ registerDbQueryCommand(db);
 registerDbExportCommand(db);
 registerDbImportCommand(db);
 registerDbListCommand(db);
+registerDbCreateCommand(db);
 registerDbSchemaCommand(db);
 
 // ── Search command (top-level) ─────────────────────────────────────

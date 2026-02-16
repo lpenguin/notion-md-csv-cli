@@ -10,16 +10,12 @@
  *   notion-cli page write <id> --file <path>           Replace page from Markdown
  *   notion-cli page create --parent <id> --file <path> Create page from Markdown
  *   notion-cli page patch <id> --lines 5:12 --content  Patch page content
- *   notion-cli page patch <id> --diff patch.diff       Apply unified diff
  *   notion-cli page list [--query <text>]              List pages
  *   notion-cli db query <id> [--filter <json>]         Query database → CSV
  *   notion-cli db export <id> --out <file.csv>         Export database → CSV
  *   notion-cli db import <id> --file <file.csv>        Import CSV → database
  *   notion-cli db list                                 List databases
  *   notion-cli db schema <id>                          Show DB schema
- *   notion-cli block list <id>                         List child blocks
- *   notion-cli block append <id> --file <path>         Append blocks from Markdown
- *   notion-cli block delete <id>                       Delete a block
  *
  * Global flags:
  *   --json        Structured JSON output (for AI agents)
@@ -57,11 +53,6 @@ import { registerDbExportCommand } from './commands/database/export.js';
 import { registerDbImportCommand } from './commands/database/import.js';
 import { registerDbListCommand } from './commands/database/list.js';
 import { registerDbSchemaCommand } from './commands/database/schema.js';
-
-// Block commands
-import { registerBlockListCommand } from './commands/block/list.js';
-import { registerBlockAppendCommand } from './commands/block/append.js';
-import { registerBlockDeleteCommand } from './commands/block/delete.js';
 
 // Search command
 import { registerSearchCommand } from './commands/search.js';
@@ -115,15 +106,6 @@ registerDbExportCommand(db);
 registerDbImportCommand(db);
 registerDbListCommand(db);
 registerDbSchemaCommand(db);
-
-// ── Block subcommand group ─────────────────────────────────────────
-const block = program
-  .command('block')
-  .description('List, append, and delete Notion blocks.');
-
-registerBlockListCommand(block);
-registerBlockAppendCommand(block);
-registerBlockDeleteCommand(block);
 
 // ── Search command (top-level) ─────────────────────────────────────
 registerSearchCommand(program);

@@ -42,9 +42,6 @@ notion-cli page create --parent <page-id> --title "My Page" --file content.md
 
 # Patch page content (AI agent friendly)
 notion-cli page patch <page-id> --lines 5:10 --content "new content"
-notion-cli page patch <page-id> --diff patch.diff
-notion-cli page patch <page-id> --append --content "appended text"
-notion-cli page patch <page-id> --prepend --content "prepended text"
 
 # List/search pages
 notion-cli page list
@@ -69,20 +66,6 @@ notion-cli db list
 
 # Get database schema
 notion-cli db schema <database-id>
-```
-
-### Blocks
-
-```bash
-# List blocks in a page
-notion-cli block list <page-id>
-
-# Append content blocks
-notion-cli block append <page-id> --file content.md
-notion-cli block append <page-id> --content "# New Section"
-
-# Delete a block
-notion-cli block delete <block-id>
 ```
 
 ### Search
@@ -110,7 +93,7 @@ notion-cli search "query" --type database
 The CLI is designed for AI/coding agents:
 
 1. **Line-numbered output**: Use `--numbered-lines` to get line numbers for precise patching
-2. **Patch support**: Apply changes via line ranges or unified diff files
+2. **Patch support**: Apply changes via line ranges (e.g., `--lines 192:256`)
 3. **JSON output**: Use `--json` for machine-readable output
 4. **No prompts**: Use `-y` to skip confirmations
 
@@ -122,9 +105,6 @@ notion-cli page read abc123 --numbered-lines
 
 # 2. Patch specific lines
 notion-cli page patch abc123 --lines 5:10 --content "replacement text" -y
-
-# 3. Or apply a diff
-notion-cli page patch abc123 --diff changes.diff -y
 ```
 
 ## License

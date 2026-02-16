@@ -8,6 +8,7 @@
  *   notion-cli search <query>                          Search pages & databases
  *   notion-cli page read <id> [--numbered-lines]       Read page as Markdown
  *   notion-cli page create --parent <id> --file <path> Create page from Markdown
+ *   notion-cli page write <id> [--file <path>]        Replace page content
  *   notion-cli page patch <id> --lines 5:12 --content  Patch page content
  *   notion-cli page list [--query <text>]              List pages
  *   notion-cli db query <id> [--filter <json>]         Query database → CSV
@@ -41,6 +42,7 @@ import { toCliError } from './lib/errors.js';
 // Page commands
 import { registerPageReadCommand } from './commands/page/read.js';
 import { registerPageCreateCommand } from './commands/page/create.js';
+import { registerPageWriteCommand } from './commands/page/write.js';
 import { registerPagePatchCommand } from './commands/page/patch.js';
 import { registerPageListCommand } from './commands/page/list.js';
 
@@ -88,6 +90,7 @@ const page = program
 
 registerPageReadCommand(page);
 registerPageCreateCommand(page);
+registerPageWriteCommand(page);
 registerPagePatchCommand(page);
 registerPageListCommand(page);
 

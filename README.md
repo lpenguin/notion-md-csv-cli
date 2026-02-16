@@ -146,19 +146,6 @@ notion-cli page read abc123 --numbered-lines
 
 ---
 
-### `page write` — Replace Entire Page Content
-
-Replace all content on a Notion page with Markdown. **This deletes all existing blocks.**
-
-```bash
-notion-cli page write <page-id> --file content.md
-notion-cli page write <page-id> --content "# Hello\n\nWorld"
-```
-
-Use `page patch` instead if you only need to change part of the page.
-
----
-
 ### `page create` — Create a New Page
 
 Create a new Notion page from Markdown content.

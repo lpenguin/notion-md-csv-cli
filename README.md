@@ -121,11 +121,21 @@ notion-cli db query <database-id> --filter '{"property":"Status","select":{"equa
 # Export to CSV
 notion-cli db export <database-id> --out data.csv
 
-# Import from CSV
-notion-cli db import <database-id> --file data.csv
+# Imports from CSV
 
-# List databases
-notion-cli db list
+```bash
+notion-cli db import <database-id> --file data.csv
+notion-cli db import <database-id> --file data.csv --sync
+```
+
+| Option | Description |
+|--------|-------------|
+| `-f, --file <path>` | **Required.** Path to CSV file |
+| `--sync` | **Synchronize mode.** Pages in Notion that are NOT in the CSV will be **archived** (sent to Trash). |
+
+> ⚠️ **Warning on --sync:** This mode is destructive. It ensures the database in Notion exactly matches your CSV. If a row exists in Notion but its `_notion_id` is missing from your CSV, it will be deleted from the database.
+
+### `db list` — List databases
 
 # Get database schema
 notion-cli db schema <database-id>

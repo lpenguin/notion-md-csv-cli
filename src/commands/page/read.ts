@@ -24,7 +24,7 @@ export function registerPageReadCommand(page: Command): void {
     .command('read')
     .description('Fetch a Notion page and output as Markdown.')
     .argument('<page-id>', 'Notion page ID or URL')
-    .option('--numbered-lines', 'Include line numbers (for use with `page patch --lines`)')
+    .option('--numbered-lines', 'Include line numbers.')
     .action(async (rawId: string, cmdOpts: { numberedLines?: boolean }) => {
       try {
         const opts = page.optsWithGlobals<GlobalOptions>();

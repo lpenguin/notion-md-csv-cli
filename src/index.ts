@@ -9,7 +9,6 @@
  *   notion-cli page read <id> [--numbered-lines]       Read page as Markdown
  *   notion-cli page create --parent <id> --file <path> Create page from Markdown
  *   notion-cli page write <id> [--file <path>]        Replace page content
- *   notion-cli page patch <id> --lines 5:12 --content  Patch page content
  *   notion-cli page list [--query <text>]              List pages
  *   notion-cli db query <id> [--filter <json>]         Query database → CSV
  *   notion-cli db export <id> --out <file.csv>         Export database → CSV
@@ -86,7 +85,7 @@ program
 // ── Page subcommand group ──────────────────────────────────────────
 const page = program
   .command('page')
-  .description('Read, write, create, and patch Notion pages.');
+  .description('Read, write, and create Notion pages.');
 
 registerPageReadCommand(page);
 registerPageCreateCommand(page);

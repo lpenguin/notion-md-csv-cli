@@ -55,7 +55,7 @@ notion-cli page read <page-id> --numbered-lines
 
 | Option | Description |
 |--------|-------------|
-| `--numbered-lines` | Prefix every line with its 1-based line number (for use with `page patch --lines`) |
+| `--numbered-lines` | Prefix every line with its 1-based line number |
 
 **Examples:**
 
@@ -63,7 +63,7 @@ notion-cli page read <page-id> --numbered-lines
 # Read page content
 notion-cli page read abc123def456
 
-# Read with line numbers for patching
+# Read with line numbers
 notion-cli page read abc123def456 --numbered-lines
 #  1: # My Document
 #  2:
@@ -76,73 +76,6 @@ notion-cli page read abc123def456 --json
 ```
 
 When `--json` is enabled, the output includes `pageId`, `title`, and `markdown` fields. Status messages are always written to stderr, and the markdown content goes to stdout, so you can pipe it safely: `notion-cli page read <id> > page.md`.
-
----
-
-### `page patch` — Surgically Edit Page Content
-
-Partially edit a Notion page using line-range replacement. Designed for AI agents and coding agents that need to make targeted edits without replacing the entire page.
-
-```bash
-notion-cli page patch <page-id> --lines <START:END> --content <text>
-notion-cli page patch <page-id> --lines <START:END> --file <path>
-```
-
-| Option | Description |
-|--------|-------------|
-| `--lines <START:END>` | **Required.** 1-indexed inclusive line range to replace (e.g. `5:12`) |
-| `-f, --file <path>` | Path to a file containing the replacement content |
-| `--content <text>` | Inline replacement content (supports `\n` escape sequences) |
-
-One of `--file` or `--content` must be provided.
-
-**How it works:**
-
-1. Fetches the page as Markdown, preserving internal block IDs.
-2. Builds a mapping from line numbers to Notion blocks.
-3. Identifies which blocks overlap with the edit range.
-4. Deletes only the affected blocks and inserts new ones — the rest of the page is untouched.
-
-This is a *surgical* operation: unaffected blocks keep their IDs, comments, and history. Child blocks (nested list items) are handled correctly.
-
-**Examples:**
-
-```bash
-# Replace a single line
-notion-cli page patch abc123 --lines 5:5 --content "Updated line 5"
-
-# Replace a range of lines from a file
-notion-cli page patch abc123 --lines 10:25 --file fix.md
-
-# Delete lines (empty content)
-notion-cli page patch abc123 --lines 8:12 --content ""
-
-# Insert new lines (replace a single line with multiple)
-notion-cli page patch abc123 --lines 5:5 --content "Line A\nLine B\nLine C"
-
-# Preview changes without applying
-notion-cli page patch abc123 --lines 5:10 --content "new text" --dry-run
-
-# Verbose output to see block-level operations
-notion-cli page patch abc123 --lines 5:10 --file fix.md --verbose
-```
-
-**Typical workflow (AI agent):**
-
-```bash
-# Step 1: Read the page with numbered lines
-notion-cli page read abc123 --numbered-lines
-
-# Step 2: Identify the lines to change from the numbered output
-
-# Step 3: Apply the patch
-notion-cli page patch abc123 --lines 42:45 --content "replacement"
-
-# Step 4: Verify the result
-notion-cli page read abc123 --numbered-lines
-```
-
-> **Note:** Line numbers change after a patch. Always re-read the page with `--numbered-lines` before making another patch.
 
 ---
 

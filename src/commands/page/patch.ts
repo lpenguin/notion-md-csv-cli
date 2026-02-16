@@ -35,7 +35,7 @@ import * as logger from '../../utils/logger.js';
 
 export function registerPagePatchCommand(page: Command): void {
   page
-    .command('patch')
+    .command('patch', { hidden: true })
     .description(
       'Partially edit a Notion page using line-range replacement.',
     )

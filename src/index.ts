@@ -19,7 +19,6 @@
  *
  * Global flags:
  *   --json        Structured JSON output (for AI agents)
- *   --yes, -y     Skip confirmation prompts (required for non-interactive use)
  *   --token       Override Notion API token
  *   --dry-run     Preview changes without executing
  *   --verbose     Debug output to stderr
@@ -29,7 +28,7 @@
  *   Set NOTION_TOKEN env var, or use --token, or create ~/.notion-cli.json
  *
  * AI Agent Usage:
- *   All commands support --json for parseable output and -y for non-interactive mode.
+ *   All commands support --json for parseable output.
  *   Data goes to stdout; status/progress goes to stderr.
  *   Exit codes: 0=success, 1=error, 2=validation, 3=auth, 4=not_found, 5=rate_limited
  */
@@ -68,7 +67,6 @@ program
   .option('--json', 'Output as structured JSON (for AI agents)')
   .option('--token <token>', 'Notion API integration token')
   .option('--dry-run', 'Preview changes without executing writes')
-  .option('-y, --yes', 'Skip all confirmation prompts')
   .option('-v, --verbose', 'Enable verbose/debug output')
   .option('--no-color', 'Disable colored output')
   .hook('preAction', (_thisCommand, actionCommand) => {

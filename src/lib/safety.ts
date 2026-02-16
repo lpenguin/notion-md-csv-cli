@@ -1,48 +1,12 @@
 /**
  * Safety module — confirmation prompts, dry-run, and write guards.
  *
- * All destructive operations require confirmation unless --yes is passed.
  * This is the single point of control for write safety.
  */
 
-import { createInterface } from 'node:readline';
 import chalk from 'chalk';
+import { createTwoFilesPatch } from 'diff';
 import * as logger from '../utils/logger.js';
-
-/**
- * Ask for user confirmation before a destructive operation.
- * Returns true if the user confirms, false otherwise.
- *
- * Skips prompt and returns true if `skipConfirm` is true (--yes / -y flag).
- * AI agents should always pass --yes to skip interactive prompts.
- */
-export async function confirmAction(
-  message: string,
-  skipConfirm: boolean,
-): Promise<boolean> {
-  if (skipConfirm) {
-    logger.debug(`Auto-confirmed: ${message}`);
-    return true;
-  }
-
-  // Non-interactive (piped stdin) → default to NO for safety
-  if (!process.stdin.isTTY) {
-    logger.warn('Non-interactive terminal detected. Use --yes to confirm. Aborting.');
-    return false;
-  }
-
-  const rl = createInterface({
-    input: process.stdin,
-    output: process.stderr, // prompts go to stderr, not stdout
-  });
-
-  return new Promise((resolve) => {
-    rl.question(`${chalk.yellow('?')} ${message} ${chalk.gray('[y/N]')} `, (answer) => {
-      rl.close();
-      resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
-    });
-  });
-}
 
 /**
  * Guard for dry-run mode.
@@ -58,28 +22,40 @@ export function isDryRun(dryRun?: boolean): boolean {
 
 /**
  * Display a diff preview before applying changes.
+ * 
+ * Shows a colored unified diff of the changes.
  */
 export function showDiffPreview(before: string, after: string): void {
-  const beforeLines = before.split('\n');
-  const afterLines = after.split('\n');
+  const diffHunk = buildDiffHunk(before, after);
+  if (diffHunk === '') {
+    process.stderr.write(chalk.gray('\nNo changes detected.\n\n'));
+    return;
+  }
 
   process.stderr.write(`\n${chalk.bold('Changes preview:')}\n`);
-
-  const maxLines = Math.max(beforeLines.length, afterLines.length);
-  for (let i = 0; i < maxLines; i++) {
-    const bLine = beforeLines[i];
-    const aLine = afterLines[i];
-
-    if (bLine === aLine) {
-      process.stderr.write(`  ${chalk.gray(bLine ?? '')}\n`);
-    } else if (bLine !== undefined && aLine !== undefined) {
-      process.stderr.write(`${chalk.red(`- ${bLine}`)}\n`);
-      process.stderr.write(`${chalk.green(`+ ${aLine}`)}\n`);
-    } else if (bLine !== undefined) {
-      process.stderr.write(`${chalk.red(`- ${bLine}`)}\n`);
-    } else if (aLine !== undefined) {
-      process.stderr.write(`${chalk.green(`+ ${aLine}`)}\n`);
+  
+  const lines = diffHunk.split('\n');
+  for (const line of lines) {
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      process.stderr.write(`${chalk.green(line)}\n`);
+    } else if (line.startsWith('-') && !line.startsWith('---')) {
+      process.stderr.write(`${chalk.red(line)}\n`);
+    } else if (line.startsWith('@@')) {
+      process.stderr.write(`${chalk.cyan(line)}\n`);
+    } else if (line.startsWith('---') || line.startsWith('+++')) {
+      // Skip file headers
+    } else {
+      process.stderr.write(` ${line}\n`);
     }
   }
   process.stderr.write('\n');
+}
+
+/**
+ * Build a unified diff hunk with context.
+ */
+function buildDiffHunk(before: string, after: string): string {
+  return createTwoFilesPatch('original', 'patched', before, after, '', '', {
+    context: 3,
+  });
 }

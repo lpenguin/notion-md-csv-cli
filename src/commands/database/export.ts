@@ -8,11 +8,10 @@
  */
 
 import { type Command } from 'commander';
-import { writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { getClient } from '../../lib/client.js';
 import { rowsToCsv } from '../../lib/csv.js';
 import { printSuccess, printError } from '../../lib/output.js';
-import { confirmAction } from '../../lib/safety.js';
 import { withRetry } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
@@ -29,18 +28,6 @@ export function registerDbExportCommand(db: Command): void {
         const opts = db.optsWithGlobals<GlobalOptions>();
         const dbId = parseNotionId(rawId);
         const client = getClient(opts.token);
-
-        // Check if output file exists
-        if (cmdOpts.out !== undefined && existsSync(cmdOpts.out)) {
-          const confirmed = await confirmAction(
-            `File "${cmdOpts.out}" already exists. Overwrite?`,
-            opts.yes === true,
-          );
-          if (!confirmed) {
-            logger.info('Aborted.');
-            return;
-          }
-        }
 
         // Fetch all rows with pagination
         const allResults: Array<Record<string, unknown>> = [];

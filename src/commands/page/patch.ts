@@ -5,32 +5,30 @@
  * Designed for AI agents / coding agents that need to make targeted edits.
  *
  * Line-range replacement (--lines START:END):
- *    notion-cli page patch <id> --lines 5:12 --content "new content" -y
- *    notion-cli page patch <id> --lines 5:12 --file patch.md -y
+ *    notion-cli page patch <id> --lines 5:12 --content "new content"
+ *    notion-cli page patch <id> --lines 5:12 --file patch.md
  *
- * Workflow:
- * 1. Fetch current page → Markdown
- * 2. Apply patch operation
- * 3. Show diff preview (skipped with -y in --json mode)
- * 4. Confirm (skipped with -y)
- * 5. Convert patched Markdown → Notion blocks (via martian)
- * 6. Replace page blocks
+ * Workflow (surgical patching):
+ * 1. Fetch page as MdBlocks (preserving block IDs)
+ * 2. Build block-to-line mapping
+ * 3. Compute which blocks need to be deleted/inserted
+ * 4. Apply changes surgically (only affected blocks)
  *
- * Safety: Requires confirmation unless --yes is passed.
  * This command is NOT idempotent.
  */
 
 import { type Command } from 'commander';
 import { readFileSync } from 'node:fs';
 import { getClient } from '../../lib/client.js';
-import { notionPageToMarkdown, markdownToNotionBlocks } from '../../lib/markdown.js';
+import { fetchPageMdBlocks, markdownToNotionBlocks } from '../../lib/markdown.js';
+import { buildBlockLineMap, computePatchPlan } from '../../lib/block-patch.js';
 import { applyPatchOperation } from '../../lib/patch.js';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
-import { confirmAction, isDryRun, showDiffPreview } from '../../lib/safety.js';
+import { isDryRun, showDiffPreview } from '../../lib/safety.js';
 import { withRetry } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { lineRangeSchema } from '../../lib/validator.js';
-import { unescapeString } from '../../utils/string.js';
+import { unescapeString, dedentMarkdown } from '../../utils/string.js';
 import { type GlobalOptions, type PatchOperation, type PagePatchResult } from '../../lib/types.js';
 import { toCliError, ValidationError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
@@ -59,108 +57,117 @@ export function registerPagePatchCommand(page: Command): void {
           const pageId = parseNotionId(rawId);
           const client = getClient(opts.token);
 
-          // 1. Determine patch operation
+          // 1. Parse patch operation
           const operation = resolvePatchOperation(cmdOpts);
 
-          // 2. Fetch current page content
+          // 2. Fetch page as MdBlocks (preserving block IDs)
           logger.info('Fetching current page content...');
-          const original = await withRetry(
-            () => notionPageToMarkdown(client, pageId),
-            'pageToMarkdown',
+          const mdBlocks = await withRetry(
+            () => fetchPageMdBlocks(client, pageId),
+            'fetchPageMdBlocks',
           );
 
-          // 3. Apply patch
-          const result = applyPatchOperation(original, operation);
+          // 3. Build block-to-line mapping
+          const { markdown: original, mappings } = buildBlockLineMap(mdBlocks);
+          logger.debug(`Built mapping for ${String(mappings.length)} blocks.`);
 
-          // 4. Show diff preview (skip in json mode with -y)
-          if (!isJsonMode() || opts.yes !== true) {
-            showDiffPreview(original, result.patched);
-          }
+          // 4. Apply text patch to get new content and diff
+          const patchResult = applyPatchOperation(original, operation);
 
-          logger.info(`${String(result.linesChanged)} lines changed.`);
+          logger.debug(`${String(patchResult.linesChanged)} lines changed.`);
 
-          // 5. Dry run check
+          // 5. Compute surgical patch plan
+          const plan = computePatchPlan(
+            mappings,
+            operation.start,
+            operation.end,
+            operation.content,
+          );
+
+          logger.debug(`Patch plan: delete ${String(plan.blocksToDelete.length)} blocks, insert ${String(plan.blocksToInsert.length)} segment(s).`);
+
+          // 7. Dry run check
           if (isDryRun(opts.dryRun)) {
-            const patchResult: PagePatchResult = {
+            const result: PagePatchResult = {
               pageId,
-              linesChanged: result.linesChanged,
-              diff: result.diff,
+              linesChanged: patchResult.linesChanged,
+              diff: patchResult.diff,
             };
-            printSuccess({ ...patchResult, dryRun: true });
+
+            if (isJsonMode()) {
+              printSuccess({
+                ...result,
+                dryRun: true,
+                plan: {
+                  blocksToDelete: plan.blocksToDelete.length,
+                  blocksToInsert: plan.blocksToInsert.length,
+                },
+              });
+            } else {
+              showDiffPreview(original, patchResult.patched);
+              logger.info(
+                `Dry run: Would delete ${String(plan.blocksToDelete.length)} blocks and insert ${String(plan.blocksToInsert.length)} segment(s).`,
+              );
+            }
             return;
           }
 
-          // 6. Confirm
-          const confirmed = await confirmAction(
-            `Apply patch to page ${pageId}? (${String(result.linesChanged)} lines changed)`,
-            opts.yes === true,
-          );
-          if (!confirmed) {
-            logger.info('Aborted.');
-            return;
-          }
-
-          // 7. Convert patched content to Notion blocks
-          const blocks = markdownToNotionBlocks(result.patched);
-
-          // 8. Replace page blocks
-          // Delete all existing blocks
-          const existingBlocks = await withRetry(
-            () => client.blocks.children.list({ block_id: pageId, page_size: 100 }),
-            'blocks.children.list',
-          );
-
-          for (const block of existingBlocks.results) {
+          // 8. Execute surgical patch
+          // Delete affected blocks
+          for (const blockId of plan.blocksToDelete) {
+            logger.debug(`Deleting block ${blockId}`);
             await withRetry(
-              () => client.blocks.delete({ block_id: block.id }),
+              () => client.blocks.delete({ block_id: blockId }),
               'blocks.delete',
             );
           }
 
-          // Handle pagination for existing blocks
-          let hasMore = existingBlocks.has_more;
-          let cursor: string | null = existingBlocks.next_cursor;
-          while (hasMore && cursor !== null) {
-            const more = await withRetry(
-              () =>
-                client.blocks.children.list({
-                  block_id: pageId,
-                  page_size: 100,
-                  start_cursor: cursor ?? undefined,
-                }),
-              'blocks.children.list',
-            );
-            for (const block of more.results) {
+          // Insert new blocks
+          for (const insert of plan.blocksToInsert) {
+            // When inserting as children of a parent block, strip the
+            // cosmetic indentation so that @tryfabric/martian does not
+            // misinterpret indented list items as code blocks.
+            const rawMd = insert.parentBlockId !== undefined
+              ? dedentMarkdown(insert.markdown)
+              : insert.markdown;
+            const newBlocks = markdownToNotionBlocks(rawMd);
+            const targetBlockId = insert.parentBlockId ?? pageId;
+
+            // Append in chunks of 100
+            for (let i = 0; i < newBlocks.length; i += 100) {
+              const chunk = newBlocks.slice(i, i + 100);
+              logger.debug(
+                `Inserting ${String(chunk.length)} blocks after ${insert.afterId ?? 'start'}${
+                  insert.parentBlockId !== undefined ? ` (as children of ${insert.parentBlockId})` : ''
+                }`,
+              );
+
               await withRetry(
-                () => client.blocks.delete({ block_id: block.id }),
-                'blocks.delete',
+                () =>
+                  client.blocks.children.append({
+                    block_id: targetBlockId,
+                    children: chunk,
+                    ...(insert.afterId !== null ? { after: insert.afterId } : {}),
+                  }),
+                'blocks.children.append',
               );
             }
-            hasMore = more.has_more;
-            cursor = more.next_cursor;
           }
 
-          // Append new blocks in chunks
-          for (let i = 0; i < blocks.length; i += 100) {
-            const chunk = blocks.slice(i, i + 100);
-            await withRetry(
-              () =>
-                client.blocks.children.append({
-                  block_id: pageId,
-                  children: chunk,
-                }),
-              'blocks.children.append',
-            );
-          }
-
-          const patchResult: PagePatchResult = {
+          const result: PagePatchResult = {
             pageId,
-            linesChanged: result.linesChanged,
-            diff: result.diff,
+            linesChanged: patchResult.linesChanged,
+            diff: patchResult.diff,
           };
 
-          printSuccess(patchResult);
-          logger.success(`Patched page ${pageId} (${String(result.linesChanged)} lines changed).`);
+          if (isJsonMode()) {
+            printSuccess(result);
+          } else {
+            showDiffPreview(original, patchResult.patched);
+            logger.success(
+              `Patched page ${pageId} (${String(patchResult.linesChanged)} lines changed, ${String(plan.blocksToDelete.length)} blocks affected).`,
+            );
+          }
         } catch (err) {
           const cliErr = toCliError(err);
           printError(cliErr.code, cliErr.message);

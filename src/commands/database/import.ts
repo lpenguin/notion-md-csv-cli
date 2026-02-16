@@ -5,7 +5,6 @@
  * - Rows with _notion_id column: update existing pages.
  * - Rows without _notion_id: create new pages.
  *
- * Safety: Requires confirmation unless --yes is passed.
  * This command is NOT idempotent (creates/updates pages).
  */
 
@@ -13,8 +12,8 @@ import { type Command } from 'commander';
 import { readFileSync } from 'node:fs';
 import { getClient } from '../../lib/client.js';
 import { csvToRows, buildPropertyValue } from '../../lib/csv.js';
-import { printSuccess, printError } from '../../lib/output.js';
-import { confirmAction, isDryRun } from '../../lib/safety.js';
+import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
+import { isDryRun } from '../../lib/safety.js';
 import { withRetry } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
@@ -58,21 +57,18 @@ export function registerDbImportCommand(db: Command): void {
         );
 
         if (isDryRun(opts.dryRun)) {
-          printSuccess({
-            databaseId: dbId,
-            toCreate: toCreate.length,
-            toUpdate: toUpdate.length,
-            dryRun: true,
-          });
-          return;
-        }
-
-        const confirmed = await confirmAction(
-          `Import ${String(rows.length)} rows into database ${dbId}?`,
-          opts.yes === true,
-        );
-        if (!confirmed) {
-          logger.info('Aborted.');
+          if (isJsonMode()) {
+            printSuccess({
+              databaseId: dbId,
+              toCreate: toCreate.length,
+              toUpdate: toUpdate.length,
+              dryRun: true,
+            });
+          } else {
+            logger.info(
+              `Dry run: Would import ${String(rows.length)} rows into database ${dbId} (${String(toCreate.length)} new, ${String(toUpdate.length)} updates).`,
+            );
+          }
           return;
         }
 
@@ -118,16 +114,21 @@ export function registerDbImportCommand(db: Command): void {
           }
         }
 
-        printSuccess({
+        const result = {
           databaseId: dbId,
           created,
           updated,
           failed,
           total: rows.length,
-        });
-        logger.success(
-          `Import complete: ${String(created)} created, ${String(updated)} updated, ${String(failed)} failed.`,
-        );
+        };
+
+        if (isJsonMode()) {
+          printSuccess(result);
+        } else {
+          logger.success(
+            `Import complete: ${String(created)} created, ${String(updated)} updated, ${String(failed)} failed.`,
+          );
+        }
       } catch (err) {
         const cliErr = toCliError(err);
         printError(cliErr.code, cliErr.message);

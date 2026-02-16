@@ -4,7 +4,6 @@
  * Create a new Notion page from Markdown content.
  * The page is created as a child of the specified parent page or database.
  *
- * Safety: Requires confirmation unless --yes is passed.
  * This command is NOT idempotent (creates a new page each time).
  */
 
@@ -13,8 +12,8 @@ import { readFileSync } from 'node:fs';
 import { getClient } from '../../lib/client.js';
 import { markdownToNotionBlocks, extractTitle } from '../../lib/markdown.js';
 import { markdownToRichText } from '@tryfabric/martian';
-import { printSuccess, printError } from '../../lib/output.js';
-import { confirmAction, isDryRun } from '../../lib/safety.js';
+import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
+import { isDryRun } from '../../lib/safety.js';
 import { withRetry } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { unescapeString } from '../../utils/string.js';
@@ -52,16 +51,11 @@ export function registerPageCreateCommand(page: Command): void {
           logger.info(`Creating page "${title}" with ${String(blocks.length)} blocks.`);
 
           if (isDryRun(opts.dryRun)) {
-            printSuccess({ parentId, title, blocksCount: blocks.length, dryRun: true });
-            return;
-          }
-
-          const confirmed = await confirmAction(
-            `Create new page "${title}" under parent ${parentId}?`,
-            opts.yes === true,
-          );
-          if (!confirmed) {
-            logger.info('Aborted.');
+            if (isJsonMode()) {
+              printSuccess({ parentId, title, blocksCount: blocks.length, dryRun: true });
+            } else {
+              logger.info(`Dry run: Would create page "${title}" under parent ${parentId}.`);
+            }
             return;
           }
 
@@ -101,13 +95,18 @@ export function registerPageCreateCommand(page: Command): void {
             );
           }
 
-          printSuccess({
+          const result = {
             pageId: createResult.id,
             title,
             url: (createResult as Record<string, unknown>)['url'] ?? '',
             blocksWritten: blocks.length,
-          });
-          logger.success(`Created page: ${title} (${createResult.id})`);
+          };
+
+          if (isJsonMode()) {
+            printSuccess(result);
+          } else {
+            logger.success(`Created page: ${title} (${createResult.id})`);
+          }
         } catch (err) {
           const cliErr = toCliError(err);
           printError(cliErr.code, cliErr.message);

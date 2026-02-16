@@ -7,7 +7,6 @@
  * WARNING: This replaces ALL existing content on the page.
  * Use `page patch` for partial edits.
  *
- * Safety: Requires confirmation unless --yes is passed.
  * This command is NOT idempotent (replaces content).
  */
 
@@ -15,8 +14,8 @@ import { type Command } from 'commander';
 import { readFileSync } from 'node:fs';
 import { getClient } from '../../lib/client.js';
 import { markdownToNotionBlocks } from '../../lib/markdown.js';
-import { printSuccess, printError } from '../../lib/output.js';
-import { confirmAction, isDryRun } from '../../lib/safety.js';
+import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
+import { isDryRun } from '../../lib/safety.js';
 import { withRetry } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { unescapeString } from '../../utils/string.js';
@@ -48,21 +47,17 @@ export function registerPageWriteCommand(page: Command): void {
 
         // Dry run check
         if (isDryRun(opts.dryRun)) {
-          printSuccess({
-            pageId,
-            blocksWritten: blocks.length,
-            dryRun: true,
-          });
-          return;
-        }
-
-        // Confirmation
-        const confirmed = await confirmAction(
-          `Replace ALL content on page ${pageId}? This cannot be undone.`,
-          opts.yes === true,
-        );
-        if (!confirmed) {
-          logger.info('Aborted.');
+          if (isJsonMode()) {
+            printSuccess({
+              pageId,
+              blocksWritten: blocks.length,
+              dryRun: true,
+            });
+          } else {
+            logger.info(
+              `Dry run: Would replace page ${pageId} with ${String(blocks.length)} blocks.`,
+            );
+          }
           return;
         }
 
@@ -98,8 +93,11 @@ export function registerPageWriteCommand(page: Command): void {
           blocksWritten: totalWritten,
         };
 
-        printSuccess(result);
-        logger.success(`Wrote ${String(totalWritten)} blocks to page ${pageId}.`);
+        if (isJsonMode()) {
+          printSuccess(result);
+        } else {
+          logger.success(`Wrote ${String(totalWritten)} blocks to page ${pageId}.`);
+        }
       } catch (err) {
         const cliErr = toCliError(err);
         printError(cliErr.code, cliErr.message);

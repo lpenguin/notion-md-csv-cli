@@ -43,7 +43,6 @@ export interface GlobalOptions {
   readonly json?: boolean;
   readonly token?: string;
   readonly dryRun?: boolean;
-  readonly yes?: boolean;
   readonly verbose?: boolean;
 }
 
@@ -107,6 +106,48 @@ export interface PatchLineRange {
 }
 
 export type PatchOperation = PatchLineRange;
+
+/** Block-to-line mapping for surgical patching. */
+export interface BlockLineMapping {
+  /** Notion block UUID. */
+  readonly blockId: string;
+  /** Block type (paragraph, heading_1, etc.). */
+  readonly type: string;
+  /** 1-indexed start line (inclusive). */
+  readonly startLine: number;
+  /** 1-indexed end line (inclusive). */
+  readonly endLine: number;
+  /** The markdown content for this block. */
+  readonly markdown: string;
+  /** Child block mappings (for nested blocks). */
+  readonly children: readonly BlockLineMapping[];
+}
+
+/** Result of building a block-line map. */
+export interface BlockLineMapResult {
+  /** The full markdown content. */
+  readonly markdown: string;
+  /** Mapping of blocks to line ranges. */
+  readonly mappings: readonly BlockLineMapping[];
+}
+
+/** A plan for surgical block patching. */
+export interface PatchPlan {
+  /** Block IDs to delete entirely. */
+  readonly blocksToDelete: readonly string[];
+  /** New blocks to insert. */
+  readonly blocksToInsert: readonly BlockInsert[];
+}
+
+/** A block insertion operation. */
+export interface BlockInsert {
+  /** Insert after this block ID. null = insert at start of page/parent. */
+  readonly afterId: string | null;
+  /** The markdown content to convert to blocks and insert. */
+  readonly markdown: string;
+  /** If set, insert as children of this block instead of at the page level. */
+  readonly parentBlockId?: string;
+}
 
 /** Config file shape. */
 export interface CliConfig {

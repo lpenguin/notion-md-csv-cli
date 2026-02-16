@@ -14,9 +14,11 @@ import { markdownToBlocks } from '@tryfabric/martian';
 import { NotionToMarkdown } from 'notion-to-md';
 import { type MdBlock } from 'notion-to-md/build/types/index.js';
 import { type Client } from '@notionhq/client';
-import { type BlockObjectRequest } from '@notionhq/client/build/src/api-endpoints.js';
+import { type BlockObjectRequest, type BlockObjectResponse, type PartialBlockObjectResponse } from '@notionhq/client/build/src/api-endpoints.js';
+import pLimit from 'p-limit';
 import { type BlockLineMapping, type BlockLineMapResult } from './types.js';
 import * as logger from '../utils/logger.js';
+import { withRetry } from './rate-limit.js';
 
 // Re-export MdBlock for use in other modules
 export type { MdBlock } from 'notion-to-md/build/types/index.js';
@@ -25,6 +27,72 @@ export type { MdBlock } from 'notion-to-md/build/types/index.js';
 interface ChildPageNotionBlock {
   id: string;
   child_page?: { title?: string };
+}
+
+/**
+ * Custom implementation of blocksToMarkdown that fetches children in parallel.
+ * This significantly speeds up page reading for complex pages.
+ */
+async function blocksToMarkdownParallel(
+  n2m: NotionToMarkdown,
+  client: Client,
+  blocks?: Array<PartialBlockObjectResponse | BlockObjectResponse>,
+): Promise<MdBlock[]> {
+  if (!blocks) return [];
+
+  const limit = pLimit(3); // Notion API limit is 3 requests per second
+
+  const mdBlocks: MdBlock[] = await Promise.all(
+    blocks.map(async (block) => {
+      const result: MdBlock = {
+        // @ts-ignore
+        type: block.type,
+        blockId: block.id,
+        parent: '',
+        children: [],
+      };
+
+      // Skip unsupported or restricted blocks
+      // @ts-ignore
+      if (block.type === 'unsupported' || !('type' in block)) {
+        return result;
+      }
+
+      // Convert the block itself to markdown
+      // @ts-ignore
+      result.parent = await n2m.blockToMarkdown(block);
+
+      // Recursive fetch for children
+      if ('has_children' in block && block.has_children) {
+        const blockId = block.id;
+
+        // Fetch children
+        const childBlocks = await limit(() => withRetry(
+          async () => {
+            const results: Array<PartialBlockObjectResponse | BlockObjectResponse> = [];
+            let cursor: string | undefined;
+            do {
+              const response = await client.blocks.children.list({
+                block_id: blockId,
+                start_cursor: cursor,
+              });
+              results.push(...response.results);
+              cursor = response.next_cursor ?? undefined;
+            } while (cursor);
+            return results;
+          },
+          `blocks.children.list(${blockId})`,
+        ));
+
+        // Recursively convert children
+        result.children = await blocksToMarkdownParallel(n2m, client, childBlocks);
+      }
+
+      return result;
+    }),
+  );
+
+  return mdBlocks;
 }
 
 /**
@@ -157,7 +225,26 @@ export async function fetchPageMdBlocks(
     return `[[${title}]](https://www.notion.so/${id})`;
   });
 
-  const blocks = await n2m.pageToMarkdown(pageId);
+  // Fetch top-level blocks
+  const topLevelBlocks = await withRetry(
+    async () => {
+      const results: Array<PartialBlockObjectResponse | BlockObjectResponse> = [];
+      let cursor: string | undefined;
+      do {
+        const response = await client.blocks.children.list({
+          block_id: pageId,
+          start_cursor: cursor,
+        });
+        results.push(...response.results);
+        cursor = response.next_cursor ?? undefined;
+      } while (cursor);
+      return results;
+    },
+    `blocks.children.list(${pageId})`,
+  );
+
+  // Convert blocks to markdown with parallel fetching for children
+  const blocks = await blocksToMarkdownParallel(n2m, client, topLevelBlocks);
 
   // Fix child_page blocks to be treated as paragraphs
   fixChildPageBlocks(blocks);

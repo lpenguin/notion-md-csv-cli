@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyPatchOperation, isValidUnifiedDiff } from '../src/lib/patch.js';
+import { applyPatchOperation } from '../src/lib/patch.js';
 
 describe('Patch Engine', () => {
   const original = [
@@ -82,44 +82,6 @@ describe('Patch Engine', () => {
     });
   });
 
-  describe('Unified diff', () => {
-    it('should apply a valid unified diff', () => {
-      const diff = [
-        '--- a/file.md',
-        '+++ b/file.md',
-        '@@ -3,3 +3,3 @@',
-        ' This is line 3.',
-        '-This is line 4.',
-        '+This is MODIFIED line 4.',
-        ' This is line 5.',
-      ].join('\n');
-
-      const result = applyPatchOperation(original, {
-        mode: 'diff',
-        patch: diff,
-      });
-
-      expect(result.patched).toContain('This is MODIFIED line 4.');
-      expect(result.linesChanged).toBeGreaterThan(0);
-    });
-
-    it('should throw on failed patch application', () => {
-      const badDiff = [
-        '--- a/file.md',
-        '+++ b/file.md',
-        '@@ -3,3 +3,3 @@',
-        ' This line does not exist in the original.',
-        '-Nonexistent line.',
-        '+Replacement.',
-        ' Also nonexistent.',
-      ].join('\n');
-
-      expect(() =>
-        applyPatchOperation(original, { mode: 'diff', patch: badDiff }),
-      ).toThrow('page content may have changed');
-    });
-  });
-
   describe('Append', () => {
     it('should append content to end', () => {
       const result = applyPatchOperation(original, {
@@ -142,17 +104,6 @@ describe('Patch Engine', () => {
       });
 
       expect(result.patched.startsWith('> Note: This is a draft.')).toBe(true);
-    });
-  });
-
-  describe('isValidUnifiedDiff', () => {
-    it('should return true for valid diff', () => {
-      const diff = '@@ -1,3 +1,3 @@\n line1\n-old\n+new\n line3';
-      expect(isValidUnifiedDiff(diff)).toBe(true);
-    });
-
-    it('should return false for non-diff text', () => {
-      expect(isValidUnifiedDiff('just some text')).toBe(false);
     });
   });
 });

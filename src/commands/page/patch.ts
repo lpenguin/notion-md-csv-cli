@@ -10,14 +10,10 @@
  *    notion-cli page patch <id> --lines 5:12 --content "new content" -y
  *    notion-cli page patch <id> --lines 5:12 --file patch.md -y
  *
- * 2. Unified diff (--diff):
- *    notion-cli page patch <id> --diff patch.diff -y
- *    cat patch.diff | notion-cli page patch <id> --diff - -y
- *
- * 3. Append (--append):
+ * 2. Append (--append):
  *    notion-cli page patch <id> --append --content "extra content" -y
  *
- * 4. Prepend (--prepend):
+ * 3. Prepend (--prepend):
  *    notion-cli page patch <id> --prepend --content "header content" -y
  *
  * Workflow:
@@ -36,7 +32,7 @@ import { type Command } from 'commander';
 import { readFileSync } from 'node:fs';
 import { getClient } from '../../lib/client.js';
 import { notionPageToMarkdown, markdownToNotionBlocks } from '../../lib/markdown.js';
-import { applyPatchOperation, isValidUnifiedDiff } from '../../lib/patch.js';
+import { applyPatchOperation } from '../../lib/patch.js';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
 import { confirmAction, isDryRun, showDiffPreview } from '../../lib/safety.js';
 import { withRetry } from '../../lib/rate-limit.js';
@@ -51,11 +47,10 @@ export function registerPagePatchCommand(page: Command): void {
   page
     .command('patch')
     .description(
-      'Partially edit a Notion page. Supports line-range, unified diff, append, and prepend.',
+      'Partially edit a Notion page. Supports line-range, append, and prepend.',
     )
     .argument('<page-id>', 'Notion page ID or URL')
     .option('--lines <range>', 'Line range to replace (e.g., "5:12", "5:" for rest of file)')
-    .option('--diff <path>', 'Path to unified diff file, or "-" for stdin')
     .option('--append', 'Append content to end of page')
     .option('--prepend', 'Prepend content to beginning of page')
     .option('-f, --file <path>', 'Path to content/patch file')
@@ -65,7 +60,6 @@ export function registerPagePatchCommand(page: Command): void {
         rawId: string,
         cmdOpts: {
           lines?: string;
-          diff?: string;
           append?: boolean;
           prepend?: boolean;
           file?: string;
@@ -78,7 +72,7 @@ export function registerPagePatchCommand(page: Command): void {
           const client = getClient(opts.token);
 
           // 1. Determine patch operation
-          const operation = await resolvePatchOperation(cmdOpts);
+          const operation = resolvePatchOperation(cmdOpts);
 
           // 2. Fetch current page content
           logger.info('Fetching current page content...');
@@ -191,29 +185,27 @@ export function registerPagePatchCommand(page: Command): void {
 /**
  * Determine the patch operation from command options.
  */
-async function resolvePatchOperation(cmdOpts: {
+function resolvePatchOperation(cmdOpts: {
   lines?: string;
-  diff?: string;
   append?: boolean;
   prepend?: boolean;
   file?: string;
   content?: string;
-}): Promise<PatchOperation> {
+}): PatchOperation {
   const modeCount = [
     cmdOpts.lines !== undefined,
-    cmdOpts.diff !== undefined,
     cmdOpts.append === true,
     cmdOpts.prepend === true,
   ].filter(Boolean).length;
 
   if (modeCount === 0) {
     throw new ValidationError(
-      'No patch mode specified. Use --lines, --diff, --append, or --prepend.',
+      'No patch mode specified. Use --lines, --append, or --prepend.',
     );
   }
   if (modeCount > 1) {
     throw new ValidationError(
-      'Multiple patch modes specified. Use only one of --lines, --diff, --append, --prepend.',
+      'Multiple patch modes specified. Use only one of --lines, --append, --prepend.',
     );
   }
 
@@ -227,24 +219,6 @@ async function resolvePatchOperation(cmdOpts: {
       end: range.end,
       content,
     };
-  }
-
-  // Mode: Unified diff
-  if (cmdOpts.diff !== undefined) {
-    let patch: string;
-    if (cmdOpts.diff === '-') {
-      patch = await readStdin();
-    } else {
-      patch = readFileSync(cmdOpts.diff, 'utf-8');
-    }
-
-    if (!isValidUnifiedDiff(patch)) {
-      throw new ValidationError(
-        'Invalid unified diff format. Expected a patch with @@ hunk headers.',
-      );
-    }
-
-    return { mode: 'diff', patch };
   }
 
   // Mode: Append
@@ -272,13 +246,4 @@ function resolveContentSync(filePath?: string, inlineContent?: string): string {
   throw new ValidationError(
     'No content provided for patch. Use --file or --content.',
   );
-}
-
-function readStdin(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    process.stdin.on('data', (chunk: Buffer) => chunks.push(chunk));
-    process.stdin.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
-    process.stdin.on('error', reject);
-  });
 }

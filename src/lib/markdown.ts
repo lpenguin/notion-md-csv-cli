@@ -45,7 +45,7 @@ async function blocksToMarkdownParallel(
   const internalQueue = queue ?? new PQueue({ concurrency: 3 });
 
   const mdBlocks: MdBlock[] = await Promise.all(
-    blocks.map(async (block) => {
+    blocks.map(async (block, index) => {
       const result: MdBlock = {
         // @ts-ignore
         type: block.type,
@@ -58,6 +58,26 @@ async function blocksToMarkdownParallel(
       // @ts-ignore
       if (block.type === 'unsupported' || !('type' in block)) {
         return result;
+      }
+
+      // Handle numbered list items: inject the current index for markdown conversion
+      // Notion API returns chunks, and typically notion-to-md expects to calculate 
+      // these IDs sequentially. Here we simulate the index for the current list.
+      // @ts-ignore
+      if (block.type === 'numbered_list_item' && block.numbered_list_item) {
+        // Calculate the relative index in the current list sequence
+        let listIndex = 1;
+        for (let i = index - 1; i >= 0; i--) {
+          const prevBlock = blocks[i];
+          // @ts-ignore
+          if (prevBlock && 'type' in prevBlock && prevBlock.type === 'numbered_list_item') {
+            listIndex++;
+          } else {
+            break;
+          }
+        }
+        // @ts-ignore
+        block.numbered_list_item.number = listIndex;
       }
 
       // Convert the block itself to markdown. 

@@ -26,7 +26,8 @@ export function registerDbImportCommand(db: Command): void {
     .description('Import CSV rows into a Notion database.')
     .argument('<db-id>', 'Notion database ID or URL')
     .requiredOption('-f, --file <path>', 'Path to CSV file')
-    .action(async (rawId: string, cmdOpts: { file: string }) => {
+    .option('--sync', 'Sycnchronize database: ARCHIVE pages not present in CSV')
+    .action(async (rawId: string, cmdOpts: { file: string; sync?: boolean }) => {
       try {
         const opts = db.optsWithGlobals<GlobalOptions>();
         const rawIdParsed = parseNotionId(rawId);
@@ -55,9 +56,35 @@ export function registerDbImportCommand(db: Command): void {
 
         const toCreate = rows.filter((r) => r.id === undefined);
         const toUpdate = rows.filter((r) => r.id !== undefined);
+        const csvIds = new Set(rows.map((r) => r.id).filter(Boolean));
+
+        let toArchive: string[] = [];
+        if (cmdOpts.sync) {
+          logger.info('Sync mode enabled: fetching current pages from Notion for comparison...');
+          let cursor: string | undefined;
+          let hasMore = true;
+          const notionIds: string[] = [];
+
+          while (hasMore) {
+            const response: any = await withRetry(
+              () =>
+                (client as any).dataSources.query({
+                  data_source_id: dbId,
+                  page_size: 100,
+                  start_cursor: cursor,
+                }),
+              'dataSources.query',
+            );
+            notionIds.push(...response.results.map((r: any) => r.id));
+            hasMore = response.has_more;
+            cursor = response.next_cursor ?? undefined;
+          }
+
+          toArchive = notionIds.filter((id) => !csvIds.has(id));
+        }
 
         logger.info(
-          `Import: ${String(toCreate.length)} new rows, ${String(toUpdate.length)} updates.`,
+          `Import: ${String(toCreate.length)} new rows, ${String(toUpdate.length)} updates, ${String(toArchive.length)} to archive.`,
         );
 
         if (isDryRun(opts.dryRun)) {
@@ -66,11 +93,12 @@ export function registerDbImportCommand(db: Command): void {
               databaseId: dbId,
               toCreate: toCreate.length,
               toUpdate: toUpdate.length,
+              toArchive: toArchive.length,
               dryRun: true,
             });
           } else {
             logger.info(
-              `Dry run: Would import ${String(rows.length)} rows into database ${dbId} (${String(toCreate.length)} new, ${String(toUpdate.length)} updates).`,
+              `Dry run: Would import ${String(rows.length)} rows into database ${dbId} (${String(toCreate.length)} new, ${String(toUpdate.length)} updates, ${String(toArchive.length)} archive).`,
             );
           }
           return;
@@ -78,7 +106,22 @@ export function registerDbImportCommand(db: Command): void {
 
         let created = 0;
         let updated = 0;
+        let archived = 0;
         let failed = 0;
+
+        // Archive pages NOT in CSV (Sync mode)
+        for (const pageId of toArchive) {
+          try {
+            await withRetry(
+              () => client.pages.update({ page_id: pageId, archived: true }),
+              'pages.update (archive)',
+            );
+            archived++;
+          } catch (err) {
+            failed++;
+            logger.warn(`Failed to archive row ${pageId}: ${String(err)}`);
+          }
+        }
 
         // Create new pages
         for (const row of toCreate) {
@@ -126,6 +169,7 @@ export function registerDbImportCommand(db: Command): void {
           databaseId: dbId,
           created,
           updated,
+          archived,
           failed,
           total: rows.length,
         };
@@ -134,7 +178,7 @@ export function registerDbImportCommand(db: Command): void {
           printSuccess(result);
         } else {
           logger.success(
-            `Import complete: ${String(created)} created, ${String(updated)} updated, ${String(failed)} failed.`,
+            `Import complete: ${String(created)} created, ${String(updated)} updated, ${String(archived)} archived, ${String(failed)} failed.`,
           );
         }
       } catch (err) {

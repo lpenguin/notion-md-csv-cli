@@ -12,7 +12,9 @@
  *   notion-cli page list [--query <text>]              List pages
  *   notion-cli db query <id> [--filter <json>]         Query database → CSV
  *   notion-cli db export <id> --out <file.csv>         Export database → CSV
- *   notion-cli db import <id> --file <file.csv>        Import CSV → database
+ *   notion-cli db insert <id> --file <file.csv>        Insert CSV rows as new pages
+ *   notion-cli db update <id> --file <file.csv>        Update existing pages from CSV
+ *   notion-cli db delete <id> --ids <id1,id2>          Archive (delete) pages by ID
  *   notion-cli db list                                 List databases
  *   notion-cli db schema <id>                          Show DB schema
  *
@@ -48,7 +50,9 @@ import { registerPageListCommand } from './commands/page/list.js';
 // Database commands
 import { registerDbQueryCommand } from './commands/database/query.js';
 import { registerDbExportCommand } from './commands/database/export.js';
-import { registerDbImportCommand } from './commands/database/import.js';
+import { registerDbInsertCommand } from './commands/database/insert.js';
+import { registerDbUpdateCommand } from './commands/database/update.js';
+import { registerDbDeleteCommand } from './commands/database/delete.js';
 import { registerDbListCommand } from './commands/database/list.js';
 import { registerDbCreateCommand } from './commands/database/create.js';
 import { registerDbSchemaCommand } from './commands/database/schema.js';
@@ -101,7 +105,9 @@ const db = program
 
 registerDbQueryCommand(db);
 registerDbExportCommand(db);
-registerDbImportCommand(db);
+registerDbInsertCommand(db);
+registerDbUpdateCommand(db);
+registerDbDeleteCommand(db);
 registerDbListCommand(db);
 registerDbCreateCommand(db);
 registerDbSchemaCommand(db);

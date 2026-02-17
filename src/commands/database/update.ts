@@ -19,7 +19,7 @@ import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError, ValidationError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
-import type { UpdatePageParameters } from '@notionhq/client';
+import { isFullPage, type UpdatePageParameters, type PageObjectResponse } from '@notionhq/client';
 
 export function registerDbUpdateCommand(db: Command): void {
   db.command('update')
@@ -76,12 +76,30 @@ export function registerDbUpdateCommand(db: Command): void {
 
         for (const row of rows) {
           try {
-            const properties = buildNotionProperties(row.properties, schemaProps);
+            const csvProperties = buildNotionProperties(row.properties, schemaProps);
+
+            // Fetch existing page properties for merge
+            const pageResponse = await withRetry(
+              () => client.pages.retrieve({ page_id: row.id ?? '' }),
+              'pages.retrieve',
+            );
+
+            let existingProperties: PageObjectResponse['properties'] = {};
+            if (isFullPage(pageResponse)) {
+              existingProperties = pageResponse.properties;
+            }
+
+            // Merge: existing properties as base, CSV values overwrite
+            const mergedProperties: Record<string, unknown> = {
+              ...existingProperties,
+              ...csvProperties,
+            };
+
             await withRetry(
               () =>
                 client.pages.update({
                   page_id: row.id ?? '',
-                  properties: properties as UpdatePageParameters['properties'],
+                  properties: mergedProperties as UpdatePageParameters['properties'],
                 }),
               'pages.update',
             );

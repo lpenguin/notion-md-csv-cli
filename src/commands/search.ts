@@ -17,7 +17,7 @@
 import { type Command } from 'commander';
 import { getClient } from '../lib/client.js';
 import { printSuccess, printError, formatTable, isJsonMode } from '../lib/output.js';
-import { withRetry } from '../lib/rate-limit.js';
+import { withRateLimit } from '../lib/rate-limit.js';
 import { type GlobalOptions, type SearchResultItem, type SearchResults } from '../lib/types.js';
 import { toCliError, ValidationError } from '../lib/errors.js';
 import * as logger from '../utils/logger.js';
@@ -64,7 +64,7 @@ export function registerSearchCommand(program: Command): void {
             };
           }
 
-          const response = await withRetry(
+          const response = await withRateLimit(
             () => client.search(searchParams as Parameters<typeof client.search>[0]),
             'search',
           );

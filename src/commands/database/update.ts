@@ -14,7 +14,7 @@ import { csvToRows } from '../../lib/csv.js';
 import { buildNotionProperties } from '../../lib/db-properties.js';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
 import { isDryRun } from '../../lib/safety.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError, ValidationError } from '../../lib/errors.js';
@@ -48,7 +48,7 @@ export function registerDbUpdateCommand(db: Command): void {
           );
         }
 
-        const dataSource = await withRetry(
+        const dataSource = await withRateLimit(
           () => client.dataSources.retrieve({ data_source_id: dbId }),
           'dataSources.retrieve',
         );
@@ -74,41 +74,43 @@ export function registerDbUpdateCommand(db: Command): void {
         let updated = 0;
         let failed = 0;
 
-        for (const row of rows) {
-          try {
-            const csvProperties = buildNotionProperties(row.properties, schemaProps);
+        await Promise.all(
+          rows.map(async (row) => {
+            try {
+              const csvProperties = buildNotionProperties(row.properties, schemaProps);
 
-            // Fetch existing page properties for merge
-            const pageResponse = await withRetry(
-              () => client.pages.retrieve({ page_id: row.id ?? '' }),
-              'pages.retrieve',
-            );
+              // Fetch existing page properties for merge
+              const pageResponse = await withRateLimit(
+                () => client.pages.retrieve({ page_id: row.id ?? '' }),
+                'pages.retrieve',
+              );
 
-            let existingProperties: PageObjectResponse['properties'] = {};
-            if (isFullPage(pageResponse)) {
-              existingProperties = pageResponse.properties;
+              let existingProperties: PageObjectResponse['properties'] = {};
+              if (isFullPage(pageResponse)) {
+                existingProperties = pageResponse.properties;
+              }
+
+              // Merge: existing properties as base, CSV values overwrite
+              const mergedProperties: Record<string, unknown> = {
+                ...existingProperties,
+                ...csvProperties,
+              };
+
+              await withRateLimit(
+                () =>
+                  client.pages.update({
+                    page_id: row.id ?? '',
+                    properties: mergedProperties as UpdatePageParameters['properties'],
+                  }),
+                'pages.update',
+              );
+              updated++;
+            } catch (err) {
+              failed++;
+              logger.warn(`Failed to update row ${row.id ?? 'unknown'}: ${String(err)}`);
             }
-
-            // Merge: existing properties as base, CSV values overwrite
-            const mergedProperties: Record<string, unknown> = {
-              ...existingProperties,
-              ...csvProperties,
-            };
-
-            await withRetry(
-              () =>
-                client.pages.update({
-                  page_id: row.id ?? '',
-                  properties: mergedProperties as UpdatePageParameters['properties'],
-                }),
-              'pages.update',
-            );
-            updated++;
-          } catch (err) {
-            failed++;
-            logger.warn(`Failed to update row ${row.id ?? 'unknown'}: ${String(err)}`);
-          }
-        }
+          }),
+        );
 
         const result = {
           databaseId: dbId,

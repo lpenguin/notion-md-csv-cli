@@ -5,16 +5,33 @@
 
 import * as logger from '../utils/logger.js';
 import { RateLimitError } from './errors.js';
+import PQueue from 'p-queue';
 
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 1000;
 const MAX_DELAY_MS = 30_000;
 
 /**
+ * Global queue for Notion API requests.
+ * Concurrency is set to 3 to stay within Notion's recommended rate limits.
+ */
+const notionQueue: PQueue = new PQueue({ concurrency: 3 });
+
+/**
+ * Execute an async function with both concurrency control and automatic retry on rate-limits.
+ */
+export async function withRateLimit<T>(
+  fn: () => Promise<T>,
+  label = 'API call',
+): Promise<T> {
+  return notionQueue.add(() => withRetry(fn, label));
+}
+
+/**
  * Execute an async function with automatic retry on rate-limit (429) errors.
  * Uses exponential backoff with jitter.
  */
-export async function withRetry<T>(
+async function withRetry<T>(
   fn: () => Promise<T>,
   label = 'API call',
 ): Promise<T> {

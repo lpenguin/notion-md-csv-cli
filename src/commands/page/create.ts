@@ -14,7 +14,7 @@ import { markdownToNotionBlocks, extractTitle } from '../../lib/markdown.js';
 import { markdownToRichText } from '@tryfabric/martian';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
 import { isDryRun } from '../../lib/safety.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { unescapeString } from '../../utils/string.js';
 import { type GlobalOptions } from '../../lib/types.js';
@@ -72,7 +72,7 @@ export function registerPageCreateCommand(page: Command): void {
 
           // Create page (with first 100 blocks)
           const firstChunk = blocks.slice(0, 100);
-          const createResult = await withRetry(
+          const createResult = await withRateLimit(
             () =>
               client.pages.create({
                 parent: parent as { database_id: string } | { page_id: string },
@@ -85,7 +85,7 @@ export function registerPageCreateCommand(page: Command): void {
           // Append remaining blocks in chunks
           for (let i = 100; i < blocks.length; i += 100) {
             const chunk = blocks.slice(i, i + 100);
-            await withRetry(
+            await withRateLimit(
               () =>
                 client.blocks.children.append({
                   block_id: createResult.id,

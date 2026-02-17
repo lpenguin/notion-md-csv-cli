@@ -10,7 +10,7 @@ import { type Command } from 'commander';
 import { getClient } from '../../lib/client.js';
 import { printSuccess, printError, formatTable } from '../../lib/output.js';
 import { isJsonMode } from '../../lib/output.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { type GlobalOptions, type SearchResultItem } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
@@ -29,7 +29,7 @@ export function registerPageListCommand(page: Command): void {
           const client = getClient(opts.token);
           const limit = parseInt(cmdOpts.limit ?? '10', 10);
 
-          const response = await withRetry(
+          const response = await withRateLimit(
             () =>
               client.search({
                 query: cmdOpts.query ?? '',
@@ -40,7 +40,7 @@ export function registerPageListCommand(page: Command): void {
             'search',
           );
 
-          const results: SearchResultItem[] = response.results.map((item) => {
+          const results: SearchResultItem[] = response.results.map((item: any) => {
             const page = item as Record<string, unknown>;
             const props = page['properties'] as Record<string, Record<string, unknown>> | undefined;
             let title = 'Untitled';

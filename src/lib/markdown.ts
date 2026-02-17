@@ -15,10 +15,9 @@ import { NotionToMarkdown } from 'notion-to-md';
 import { type MdBlock } from 'notion-to-md/build/types/index.js';
 import { type Client } from '@notionhq/client';
 import { type BlockObjectRequest, type BlockObjectResponse, type PartialBlockObjectResponse } from '@notionhq/client/build/src/api-endpoints.js';
-import PQueue from 'p-queue';
 import { type BlockLineMapping, type BlockLineMapResult } from './types.js';
 import * as logger from '../utils/logger.js';
-import { withRetry } from './rate-limit.js';
+import { withRateLimit } from './rate-limit.js';
 
 // Re-export MdBlock for use in other modules
 export type { MdBlock } from 'notion-to-md/build/types/index.js';
@@ -36,13 +35,9 @@ async function blocksToMarkdownParallel(
   n2m: NotionToMarkdown,
   client: Client,
   blocks?: Array<PartialBlockObjectResponse | BlockObjectResponse>,
-  queue?: PQueue,
+  // No longer taking queue, will use withRateLimit
 ): Promise<MdBlock[]> {
   if (!blocks) return [];
-
-  // Initialize queue if not provided (top-level call)
-  // Notion API limit is 3 requests per second
-  const internalQueue = queue ?? new PQueue({ concurrency: 3 });
 
   const mdBlocks: MdBlock[] = await Promise.all(
     blocks.map(async (block, index) => {
@@ -90,7 +85,7 @@ async function blocksToMarkdownParallel(
         const blockId = block.id;
 
         // Fetch children using the shared specialized queue
-        const childBlocks = await internalQueue.add(() => withRetry(
+        const childBlocks = await withRateLimit(
           async () => {
             const results: Array<PartialBlockObjectResponse | BlockObjectResponse> = [];
             let cursor: string | undefined;
@@ -105,10 +100,10 @@ async function blocksToMarkdownParallel(
             return results;
           },
           `blocks.children.list(${blockId})`,
-        ));
+        );
 
-        // Recursively convert children, passing the same queue
-        result.children = await blocksToMarkdownParallel(n2m, client, childBlocks, internalQueue);
+        // Recursively convert children
+        result.children = await blocksToMarkdownParallel(n2m, client, childBlocks);
       }
 
       return result;
@@ -249,7 +244,7 @@ export async function fetchPageMdBlocks(
   });
 
   // Fetch top-level blocks
-  const topLevelBlocks = await withRetry(
+  const topLevelBlocks = await withRateLimit(
     async () => {
       const results: Array<PartialBlockObjectResponse | BlockObjectResponse> = [];
       let cursor: string | undefined;

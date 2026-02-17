@@ -14,7 +14,7 @@ import { csvToRows } from '../../lib/csv.js';
 import { buildNotionProperties } from '../../lib/db-properties.js';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
 import { isDryRun } from '../../lib/safety.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError, ValidationError } from '../../lib/errors.js';
@@ -48,7 +48,7 @@ export function registerDbInsertCommand(db: Command): void {
           );
         }
 
-        const dataSource = await withRetry(
+        const dataSource = await withRateLimit(
           () => client.dataSources.retrieve({ data_source_id: dbId }),
           'dataSources.retrieve',
         );
@@ -74,23 +74,25 @@ export function registerDbInsertCommand(db: Command): void {
         let created = 0;
         let failed = 0;
 
-        for (const row of rows) {
-          try {
-            const properties = buildNotionProperties(row.properties, schemaProps);
-            await withRetry(
-              () =>
-                client.pages.create({
-                  parent: { database_id: rawIdParsed },
-                  properties: properties as CreatePageParameters['properties'],
-                }),
-              'pages.create',
-            );
-            created++;
-          } catch (err) {
-            failed++;
-            logger.warn(`Failed to create row: ${String(err)}`);
-          }
-        }
+        await Promise.all(
+          rows.map(async (row) => {
+            try {
+              const properties = buildNotionProperties(row.properties, schemaProps);
+              await withRateLimit(
+                () =>
+                  client.pages.create({
+                    parent: { database_id: rawIdParsed },
+                    properties: properties as CreatePageParameters['properties'],
+                  }),
+                'pages.create',
+              );
+              created++;
+            } catch (err) {
+              failed++;
+              logger.warn(`Failed to create row: ${String(err)}`);
+            }
+          }),
+        );
 
         const result = {
           databaseId: dbId,

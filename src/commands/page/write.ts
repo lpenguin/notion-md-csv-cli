@@ -16,7 +16,7 @@ import { getClient } from '../../lib/client.js';
 import { markdownToNotionBlocks } from '../../lib/markdown.js';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
 import { isDryRun } from '../../lib/safety.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { unescapeString } from '../../utils/string.js';
 import { type GlobalOptions, type PageWriteResult } from '../../lib/types.js';
@@ -58,7 +58,7 @@ export function registerPageWriteCommand(page: Command): void {
         }
 
         // Clear existing content using erase_content: true
-        await withRetry(
+        await withRateLimit(
           () =>
             client.pages.update({
               page_id: pageId,
@@ -71,7 +71,7 @@ export function registerPageWriteCommand(page: Command): void {
         let totalWritten = 0;
         for (let i = 0; i < blocks.length; i += 100) {
           const chunk = blocks.slice(i, i + 100);
-          await withRetry(
+          await withRateLimit(
             () =>
               client.blocks.children.append({
                 block_id: pageId,

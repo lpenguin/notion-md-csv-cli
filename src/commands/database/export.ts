@@ -12,7 +12,7 @@ import { writeFileSync } from 'node:fs';
 import { getClient, resolveDataSourceId } from '../../lib/client.js';
 import { rowsToCsv } from '../../lib/csv.js';
 import { printSuccess, printError } from '../../lib/output.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
@@ -39,7 +39,7 @@ export function registerDbExportCommand(db: Command): void {
         let hasMore = true;
 
         while (hasMore) {
-          const response: QueryDataSourceResponse = await withRetry(
+          const response: QueryDataSourceResponse = await withRateLimit(
             () =>
               client.dataSources.query({
                 data_source_id: dbId,

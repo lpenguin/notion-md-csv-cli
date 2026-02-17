@@ -25,7 +25,7 @@ import { buildBlockLineMap, computePatchPlan } from '../../lib/block-patch.js';
 import { applyPatchOperation } from '../../lib/patch.js';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
 import { isDryRun, showDiffPreview } from '../../lib/safety.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { lineRangeSchema } from '../../lib/validator.js';
 import { unescapeString, dedentMarkdown } from '../../utils/string.js';
@@ -62,7 +62,7 @@ export function registerPagePatchCommand(page: Command): void {
 
           // 2. Fetch page as MdBlocks (preserving block IDs)
           logger.info('Fetching current page content...');
-          const mdBlocks = await withRetry(
+          const mdBlocks = await withRateLimit(
             () => fetchPageMdBlocks(client, pageId),
             'fetchPageMdBlocks',
           );
@@ -116,7 +116,7 @@ export function registerPagePatchCommand(page: Command): void {
           // Delete affected blocks
           for (const blockId of plan.blocksToDelete) {
             logger.debug(`Deleting block ${blockId}`);
-            await withRetry(
+            await withRateLimit(
               () => client.blocks.delete({ block_id: blockId }),
               'blocks.delete',
             );
@@ -142,7 +142,7 @@ export function registerPagePatchCommand(page: Command): void {
                 }`,
               );
 
-              await withRetry(
+              await withRateLimit(
                 () =>
                   client.blocks.children.append({
                     block_id: targetBlockId,

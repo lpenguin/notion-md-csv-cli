@@ -10,7 +10,7 @@
 import { type Command } from 'commander';
 import { getClient, resolveDataSourceId } from '../../lib/client.js';
 import { printSuccess, printError, formatTable, isJsonMode } from '../../lib/output.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions, type DbSchema, type DbPropertySchema } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
@@ -30,7 +30,7 @@ export function registerDbSchemaCommand(db: Command): void {
         // Resolve db ID to data source ID
         const dbId = await resolveDataSourceId(client, rawIdParsed);
 
-        const dataSource: GetDataSourceResponse = await withRetry(
+        const dataSource: GetDataSourceResponse = await withRateLimit(
           () => client.dataSources.retrieve({ data_source_id: dbId }),
           'dataSources.retrieve',
         );

@@ -12,7 +12,7 @@
 import { type Command } from 'commander';
 import { getClient } from '../../lib/client.js';
 import { notionPageToMarkdown, addLineNumbers } from '../../lib/markdown.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
@@ -32,7 +32,7 @@ export function registerPageReadCommand(page: Command): void {
         const client = getClient(opts.token);
 
         // Fetch page metadata
-        const pageObj = await withRetry(
+        const pageObj = await withRateLimit(
           () => client.pages.retrieve({ page_id: pageId }),
           'pages.retrieve',
         );
@@ -53,7 +53,7 @@ export function registerPageReadCommand(page: Command): void {
         }
 
         // Fetch and convert content
-        let markdown = await withRetry(
+        let markdown = await withRateLimit(
           () => notionPageToMarkdown(client, pageId),
           'pageToMarkdown',
         );

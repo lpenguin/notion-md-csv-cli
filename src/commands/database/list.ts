@@ -9,7 +9,7 @@
 import { type Command } from 'commander';
 import { getClient } from '../../lib/client.js';
 import { printSuccess, printError, formatTable, isJsonMode } from '../../lib/output.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { type GlobalOptions, type SearchResultItem } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
 import * as logger from '../../utils/logger.js';
@@ -26,7 +26,7 @@ export function registerDbListCommand(db: Command): void {
         const client = getClient(opts.token);
         const limit = parseInt(cmdOpts.limit ?? '20', 10);
 
-        const response = await withRetry(
+        const response = await withRateLimit(
           () =>
             client.search({
               query: cmdOpts.query ?? '',

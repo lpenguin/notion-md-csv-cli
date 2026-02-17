@@ -5,6 +5,7 @@
 import { Client, APIResponseError, APIErrorCode, isFullDatabase } from '@notionhq/client';
 import { resolveToken } from './config.js';
 import * as logger from '../utils/logger.js';
+import { withRateLimit } from './rate-limit.js';
 
 let clientInstance: Client | undefined;
 
@@ -35,10 +36,15 @@ export function getClient(cliToken?: string): Client {
 export async function resolveDataSourceId(client: Client, dbId: string): Promise<string> {
   try {
     // We attempt to retrieve as a database first
-    const db = await client.databases.retrieve({ database_id: dbId });
+    const db = await withRateLimit(
+      () => client.databases.retrieve({ database_id: dbId }),
+      'databases.retrieve',
+    );
 
     // Check if the database has data_sources (new API)
-    if (isFullDatabase(db) && db.data_sources.length > 0) {
+    // @ts-ignore - data_sources might be new in the SDK
+    if (isFullDatabase(db) && db.data_sources && db.data_sources.length > 0) {
+      // @ts-ignore
       const firstDataSource = db.data_sources[0];
       if (firstDataSource !== undefined) {
         return firstDataSource.id;
@@ -48,7 +54,11 @@ export async function resolveDataSourceId(client: Client, dbId: string): Promise
     // If retrieve fails with 404, it might already be a data_source ID (which databases.retrieve won't find)
     if (APIResponseError.isAPIResponseError(err) && err.code === APIErrorCode.ObjectNotFound) {
       try {
-        const ds = await client.dataSources.retrieve({ data_source_id: dbId });
+        const ds = await withRateLimit(
+          // @ts-ignore - dataSources might be new in the SDK
+          () => client.dataSources.retrieve({ data_source_id: dbId }),
+          'dataSources.retrieve',
+        );
         return ds.id;
       } catch {
         // Fallback to original ID if all else fails

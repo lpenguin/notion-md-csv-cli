@@ -10,7 +10,7 @@ import { type Command } from 'commander';
 import { getClient, resolveDataSourceId } from '../../lib/client.js';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
 import { isDryRun } from '../../lib/safety.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError, ValidationError } from '../../lib/errors.js';
@@ -63,18 +63,20 @@ export function registerDbDeleteCommand(db: Command): void {
         let archived = 0;
         let failed = 0;
 
-        for (const pageId of pageIds) {
-          try {
-            await withRetry(
-              () => client.pages.update({ page_id: pageId, archived: true }),
-              'pages.update (archive)',
-            );
-            archived++;
-          } catch (err) {
-            failed++;
-            logger.warn(`Failed to archive page ${pageId}: ${String(err)}`);
-          }
-        }
+        await Promise.all(
+          pageIds.map(async (pageId) => {
+            try {
+              await withRateLimit(
+                () => client.pages.update({ page_id: pageId, archived: true }),
+                'pages.update (archive)',
+              );
+              archived++;
+            } catch (err) {
+              failed++;
+              logger.warn(`Failed to archive page ${pageId}: ${String(err)}`);
+            }
+          }),
+        );
 
         const result = {
           databaseId: dbId,

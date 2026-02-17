@@ -7,7 +7,7 @@
 import { type Command } from 'commander';
 import { getClient } from '../../lib/client.js';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
-import { withRetry } from '../../lib/rate-limit.js';
+import { withRateLimit } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
 import { toCliError } from '../../lib/errors.js';
@@ -48,7 +48,7 @@ export function registerDbCreateCommand(db: Command): void {
           return;
         }
 
-        const response = (await withRetry(
+        const response = (await withRateLimit(
           () =>
             client.databases.create({
               parent: {

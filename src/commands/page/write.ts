@@ -13,7 +13,7 @@
 import { type Command } from 'commander';
 import { readFileSync } from 'node:fs';
 import { getClient } from '../../lib/client.js';
-import { markdownToNotionBlocks } from '../../lib/markdown.js';
+import { markdownToNotionBlocks, processImageUploads } from '../../lib/markdown.js';
 import { printSuccess, printError, isJsonMode } from '../../lib/output.js';
 import { isDryRun } from '../../lib/safety.js';
 import { withRateLimit } from '../../lib/rate-limit.js';
@@ -41,7 +41,10 @@ export function registerPageWriteCommand(page: Command): void {
         const markdown = await resolveContent(cmdOpts.file, cmdOpts.content);
 
         // Convert to Notion blocks
-        const blocks = markdownToNotionBlocks(markdown);
+        let blocks = markdownToNotionBlocks(markdown);
+        
+        // Process and upload file:// images
+        blocks = await processImageUploads(client, blocks);
 
         logger.debug(`Will replace page content with ${String(blocks.length)} blocks.`);
 

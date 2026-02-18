@@ -18,6 +18,7 @@ import { type BlockObjectRequest, type BlockObjectResponse, type PartialBlockObj
 import { type BlockLineMapping, type BlockLineMapResult } from './types.js';
 import * as logger from '../utils/logger.js';
 import { withRateLimit } from './rate-limit.js';
+import { isFileUrl, fileUrlToPath, uploadFileToNotion } from './file-upload.js';
 
 // Re-export MdBlock for use in other modules
 export type { MdBlock } from 'notion-to-md/build/types/index.js';
@@ -125,6 +126,62 @@ export function markdownToNotionBlocks(markdown: string): BlockObjectRequest[] {
   logger.debug(`Produced ${String(blocks.length)} Notion blocks.`);
   return blocks;
 }
+
+/**
+ * Process blocks and upload any file:// images to Notion.
+ * Returns modified blocks with uploaded file IDs.
+ */
+export async function processImageUploads(
+  client: Client,
+  blocks: BlockObjectRequest[],
+): Promise<BlockObjectRequest[]> {
+  const processedBlocks: BlockObjectRequest[] = [];
+  
+  for (const block of blocks) {
+    let processedBlock = block;
+    
+    // Check if this is an image block with external URL
+    if (block.type === 'image' && 'image' in block) {
+      const imageBlock = block.image;
+      
+      // Check if it's an external image
+      if ('type' in imageBlock && imageBlock.type === 'external' && 'external' in imageBlock) {
+        const external = imageBlock.external;
+        
+        if ('url' in external && typeof external.url === 'string' && isFileUrl(external.url)) {
+          // This is a file:// URL, upload it
+          const filePath = fileUrlToPath(external.url);
+          
+          try {
+            const fileUploadId = await uploadFileToNotion(client, filePath);
+            
+            // Replace with file_upload reference
+            processedBlock = {
+              ...block,
+              image: {
+                type: 'file_upload',
+                file_upload: {
+                  id: fileUploadId,
+                },
+                caption: 'caption' in imageBlock ? imageBlock.caption : undefined,
+              },
+            };
+            
+            logger.debug(`Replaced file:// image with upload ID: ${fileUploadId}`);
+          } catch (err) {
+            logger.debug(`Failed to upload image ${filePath}: ${String(err)}`);
+            // Keep the original block if upload fails
+          }
+        }
+      }
+    }
+    
+    processedBlocks.push(processedBlock);
+  }
+  
+  return processedBlocks;
+}
+
 
 /**
  * Unified MdBlock to Markdown converter.

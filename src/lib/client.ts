@@ -42,9 +42,7 @@ export async function resolveDataSourceId(client: Client, dbId: string): Promise
     );
 
     // Check if the database has data_sources (new API)
-    // @ts-ignore - data_sources might be new in the SDK
-    if (isFullDatabase(db) && db.data_sources && db.data_sources.length > 0) {
-      // @ts-ignore
+    if (isFullDatabase(db) && db.data_sources.length > 0) {
       const firstDataSource = db.data_sources[0];
       if (firstDataSource !== undefined) {
         return firstDataSource.id;

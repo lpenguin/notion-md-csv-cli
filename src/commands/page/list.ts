@@ -7,6 +7,7 @@
  */
 
 import { type Command } from 'commander';
+import { isFullPage } from '@notionhq/client';
 import { getClient } from '../../lib/client.js';
 import { printSuccess, printError, formatTable } from '../../lib/output.js';
 import { isJsonMode } from '../../lib/output.js';
@@ -40,17 +41,13 @@ export function registerPageListCommand(page: Command): void {
             'search',
           );
 
-          const results: SearchResultItem[] = response.results.map((item: any) => {
-            const page = item as Record<string, unknown>;
-            const props = page['properties'] as Record<string, Record<string, unknown>> | undefined;
+          const results: SearchResultItem[] = response.results.map((item) => {
             let title = 'Untitled';
-            if (props !== undefined) {
+            if (isFullPage(item)) {
+              const props = item.properties;
               for (const prop of Object.values(props)) {
-                if (prop['type'] === 'title') {
-                  const titleArr = prop['title'] as Array<Record<string, unknown>> | undefined;
-                  if (titleArr !== undefined && titleArr.length > 0) {
-                    title = (titleArr[0]?.['plain_text'] as string | undefined) ?? 'Untitled';
-                  }
+                if (prop.type === 'title' && prop.title.length > 0) {
+                  title = prop.title[0]?.plain_text ?? 'Untitled';
                   break;
                 }
               }
@@ -60,8 +57,8 @@ export function registerPageListCommand(page: Command): void {
               id: item.id,
               type: 'page' as const,
               title,
-              url: (page['url'] as string | undefined) ?? '',
-              lastEditedTime: (page['last_edited_time'] as string | undefined) ?? '',
+              url: 'url' in item ? item.url : '',
+              lastEditedTime: 'last_edited_time' in item ? item.last_edited_time : '',
             };
           });
 

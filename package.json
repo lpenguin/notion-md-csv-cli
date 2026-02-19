@@ -1,6 +1,6 @@
 {
   "name": "@lpenguin/notion-cli",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "CLI tool for reading and editing Notion entries through Markdown and CSV. AI agent friendly.",
   "type": "module",
   "bin": {

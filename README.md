@@ -1,4 +1,4 @@
-# notion-md-csv-cli
+# notion-cli
 
 CLI tool for reading and editing Notion entries through Markdown and CSV. AI agent friendly.
 
@@ -6,10 +6,10 @@ CLI tool for reading and editing Notion entries through Markdown and CSV. AI age
 
 ```bash
 # Run directly with npx
-npx notion-md-csv-cli page read <page-id>
+npx notion-cli page read <page-id>
 
 # Or install globally
-npm install -g notion-md-csv-cli
+npm install -g notion-cli
 notion-cli page read <page-id>
 ```
 

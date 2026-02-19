@@ -50,26 +50,13 @@ Fetch a Notion page and output its content as Markdown. This command is idempote
 
 ```bash
 notion-cli page read <page-id>
-notion-cli page read <page-id> --numbered-lines
 ```
-
-| Option | Description |
-|--------|-------------|
-| `--numbered-lines` | Prefix every line with its 1-based line number |
 
 **Examples:**
 
 ```bash
 # Read page content
 notion-cli page read abc123def456
-
-# Read with line numbers
-notion-cli page read abc123def456 --numbered-lines
-#  1: # My Document
-#  2:
-#  3: Some content here.
-#  4: - Item A
-#  5: - Item B
 
 # Read as JSON (for scripting)
 notion-cli page read abc123def456 --json

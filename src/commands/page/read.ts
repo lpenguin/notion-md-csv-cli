@@ -3,15 +3,12 @@
  *
  * Fetch a Notion page and output its content as Markdown.
  *
- * Options:
- *   --numbered-lines  Output with line numbers (for subsequent patching)
- *
  * This command is idempotent and read-only.
  */
 
 import { type Command } from 'commander';
 import { getClient } from '../../lib/client.js';
-import { notionPageToMarkdown, addLineNumbers } from '../../lib/markdown.js';
+import { notionPageToMarkdown } from '../../lib/markdown.js';
 import { withRateLimit } from '../../lib/rate-limit.js';
 import { parseNotionId } from '../../utils/id.js';
 import { type GlobalOptions } from '../../lib/types.js';
@@ -24,8 +21,7 @@ export function registerPageReadCommand(page: Command): void {
     .command('read')
     .description('Fetch a Notion page and output as Markdown.')
     .argument('<page-id>', 'Notion page ID or URL')
-    .option('--numbered-lines', 'Include line numbers.')
-    .action(async (rawId: string, cmdOpts: { numberedLines?: boolean }) => {
+    .action(async (rawId: string) => {
       try {
         const opts = page.optsWithGlobals<GlobalOptions>();
         const pageId = parseNotionId(rawId);
@@ -76,14 +72,10 @@ export function registerPageReadCommand(page: Command): void {
         }
 
         // Fetch and convert content
-        let markdown = await withRateLimit(
+        const markdown = await withRateLimit(
           () => notionPageToMarkdown(client, pageId),
           'pageToMarkdown',
         );
-
-        if (cmdOpts.numberedLines === true) {
-          markdown = addLineNumbers(markdown);
-        }
 
         const lastEditedTime = (pageObj as Record<string, unknown>)['last_edited_time'] as string;
 

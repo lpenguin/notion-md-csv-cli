@@ -6,7 +6,7 @@
  *
  * Usage:
  *   notion-cli search <query>                          Search pages & databases
- *   notion-cli page read <id> [--numbered-lines]       Read page as Markdown
+ *   notion-cli page read <id>                          Read page as Markdown
  *   notion-cli page create --parent <id> --file <path> Create page from Markdown
  *   notion-cli page write <id> [--file <path>]        Replace page content
  *   notion-cli page write-properties <id> --file <f>  Update page properties from CSV

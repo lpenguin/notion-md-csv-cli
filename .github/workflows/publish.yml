@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version slug (e.g. patch, minor, major, or v1.2.3)"
+        description: "Version slug (e.g. patch, minor, major, or 1.2.3)"
         required: true
 
 jobs:
@@ -43,14 +43,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Bump version
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          # Strip leading 'v' if present (e.g. v1.2.3 -> 1.2.3)
-          if [[ "$VERSION" =~ ^v[0-9] ]]; then
-            npm version "${VERSION#v}" --no-git-tag-version
-          else
-            npm version "$VERSION" --no-git-tag-version
-          fi
+        run: npm version "${{ github.event.inputs.version }}" --no-git-tag-version
 
       - name: Commit and tag version bump
         run: |
